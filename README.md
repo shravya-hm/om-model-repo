@@ -1,1 +1,1 @@
-# om-model-repoMaster Thesis
+# Shravya's Master Thesis OpenModelica Models
