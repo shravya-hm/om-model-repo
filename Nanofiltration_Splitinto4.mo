@@ -77,7 +77,7 @@ package Nanofiltration_CP
 
     Outlet Out; 
     extends calculated_flows;
-    parameter Real c_raw = 270 "Concentration of contaminant / mg/L";
+    parameter Real c_raw = 100 "Concentration of contaminant / mg/L";
     Real Q_raw "raw water flowrate calculated based on Y / L/h" ;
  
     equation
