@@ -21,7 +21,7 @@ package Nanofiltration_CP
   
   record set_flow_parameters
     
-  parameter Modelica.SIunits.Velocity u_cf =0.25; //Crossflow velocity at the membrane inlet
+  parameter Modelica.SIunits.Velocity u_cf =1; //Crossflow velocity at the membrane inlet
   parameter Real J_p = 35; //Average permeate flux as the permeate leaves the membrane L/hm^2
   parameter Real Y = 0.70; //Water conversion factor (Q_p/Q_raw)
   parameter Real k_w = 25;   //water permeability through the membrane in L/hm^2
