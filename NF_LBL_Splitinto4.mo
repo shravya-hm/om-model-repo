@@ -1,4 +1,4 @@
-package Nanofiltration_CP
+package NF_LBL
   
  connector Inlet
   flow Real Q(quantity="volumetric flowrate", unit="L/h") "Flowrate"; 
@@ -13,23 +13,18 @@ package Nanofiltration_CP
  record membrane_properties
 
   parameter Real n = 7"Number of capillaries per fiber";
-  parameter Real m = 15"Number of Membrane Fibers";
+  parameter Real m = 1"Number of Membrane Fibers";
   parameter Modelica.SIunits.Length d_cap = 0.0009 "Capillary diameter";
-  parameter Modelica.SIunits.Length l_m = 1.5 "Capillary membrane length";
-  parameter Real sn = 4 "number of segments";
+  parameter Modelica.SIunits.Length l_m = 2 "Capillary membrane length";
  
   end membrane_properties;
   
   record set_flow_parameters
     
-  parameter Modelica.SIunits.Velocity u_cf = 0.4; //Crossflow velocity at the membrane inlet
+  parameter Modelica.SIunits.Velocity u_cf =1; //Crossflow velocity at the membrane inlet
   parameter Real J_p = 35; //Average permeate flux as the permeate leaves the membrane L/hm^2
-  parameter Real Y = 0.40; //Water conversion factor (Q_p/Q_raw)
-  //parameter Real R = 0.81; //rejection rate of the membrane
-  parameter Real R_int = 0.90; //intrinsic retention of membrane
-  parameter Real k_w = 18.3;   //water permeability through the membrane in L/hm^2
-  parameter Real c_raw = 100 "Concentration of contaminant / mg/L";
-  
+  parameter Real Y = 0.70; //Water conversion factor (Q_p/Q_raw)
+  parameter Real k_w = 25;   //water permeability through the membrane in L/hm^2
   end set_flow_parameters;
   
   record Conc_pol_parameters
@@ -39,8 +34,7 @@ package Nanofiltration_CP
   Real Sh "Sherwoodnumber";
   Real CP "concentration polarization";
   Real delta "d_h/Sh";
-  Real k "D_i.Sh/d_h"; //mass transfer coefficient
-  
+  Real k "D_i.Sh/d_h";
   //input
   constant Real D_i = 1.07*10^(-9) "Diffusion coefficient / m²/s";
   
@@ -48,13 +42,15 @@ package Nanofiltration_CP
 
   record osmopressure_solute
   
-   constant Real R_gasconstant = Modelica.Constants.R;
-   parameter Real alpha = 1 "disscociation constant between 0 and 1";
-   parameter Real T = 293 "temperature /K";
-   parameter Real v = 2 "stoichiometric coefficient";
- //c_f is the only varaiation from one membrane module to the next
-   Real P_osmotic;
-   Real B;
+  constant Real R_gasconstant = Modelica.Constants.R;
+  parameter Real alpha = 1 "disscociation constant
+  between 0 and 1";
+  parameter Real T = 293 "temperature /K";
+  //why error
+  parameter Real v = 2 "stoichiometric coefficient";
+ //c_f is the only variation from one membrane module to the next
+    Real P_osmotic;
+  Real B;
   
   end osmopressure_solute;
   
@@ -81,6 +77,7 @@ package Nanofiltration_CP
 
     Outlet Out; 
     extends calculated_flows;
+    parameter Real c_raw = 100 "Concentration of contaminant / mg/L";
     Real Q_raw "raw water flowrate calculated based on Y / L/h" ;
  
     equation
@@ -107,54 +104,69 @@ package Nanofiltration_CP
   model Membrane
   
   Inlet In;
-  Outlet Out_P, Out_MO;
-  Real R_obs "rejection considering CP";
-  Real c_m "concentration along the membrane / mg/L";
-  Real c_f "concentration of feed or bulk / mg/L";
-  Real t "thickness of boundary layer / m";
+  Outlet Out_P, Out_M;
+  
+  Real sn "segment number";
+  
+  Real R_obssn "rejection considering CP";
+  Real c_msn "concentration along the membrane / mg/L";
+  Real c_fsn "concentration of feed or bulk / mg/L";
+  Real tsn "thickness of boundary layer / m";
   Real TMP "transmembrane pressure /bar";
   Real WCF "water conversion factor";
-  Real P_loss "pressure loss from inlet to outlet of the membrane due to friction, only accounted for by the concentration polarization in this model";
-  Real P_loss_HP "Hagen Poisuelle pressure loss from inlet to outlet of the membrane due to friction, only accounted for by the concentration polarization in this model";
-  Real R_raw "Rejecion of conductivity with respect to raw water";
   
+  Real P_loss "Pressure loss";
+  Real P_loss_HP "Pressure loss along the membrane length using Hagen-poiseuille equation";
+  parameter Real rho = 998.2 "density of water kg/m^3";
+  parameter Real mu = 1 * 10^ (-3) "dynamic viscosity / Pa.s" ;
   
+  Real Q_psn "permeate leaving segment n";
+  Real J_psn "permeate flux through segment sn";
+  Real u_cfsn;
+  //Parameter assumption to test the model-
+    //Pressure varies with velocity and a relationship must be attained experimentally, or J_p(TMP) must be calculated by another method and not Darcy's law
+    //Intrinsic retetntion can be obtained from experimental calculations
+  parameter Real P_in = 2;
+  Real P_out;
   
-  
+  parameter Real R_int = 0.81; //intrinsic retention of membrane
   
   extends calculated_flows;
   extends Conc_pol_parameters;
   extends osmopressure_solute;
   
+  
   protected
   Real f_D = 64 / Re "friction factor";
-  Real mu = 1 * 10^ (-3) "dynamic viscosity / Pa.s" ;
-  Real rho = 998.2 "density of water kg/m^3";
-    
+  
   equation
-  In.c = c_f;
+  In.c = c_fsn;
   //Out_P.c = In.c * (1-R); // permeate from the membrane calculated based on assumed R value
   
-  Out_P.Q = -abs(Q_p);
-  In.Q + Out_P.Q + Out_MO.Q = 0;
-  (Out_P.c * Out_P.Q) + (Out_MO.c * Out_MO.Q) +  (In.c * In.Q) = 0;
+  Q_psn = J_psn * A_act;
+  u_cfsn = In.Q / A_cf * 3600 * 1000;
+  
+  Out_P.Q = -abs(Q_psn);
+  In.Q + Out_P.Q + Out_M.Q = 0;
+  (Out_P.c * Out_P.Q) + (Out_M.c * Out_M.Q) +  (In.c * In.Q) = 0;
   WCF = abs(Out_P.Q/In.Q);
   
-  (CP, Re, Sc, Sh, delta, k)= Concentration_polarization(d_cap, D_i, l_m, c_f, u_cf, J_p, R_int);
-  c_m = CP * c_f; //calculates concentration along the membrane
-  R_int = 1 - (Out_P.c/c_m); //calculates permeate concetration
-  R_obs = 1 - (Out_P.c/c_f); // calculates rejection
-  t = D_i/k;
+  (CP, Re, Sc, Sh, delta, k) = Concentration_polarization(d_cap, D_i, l_m*sn/4, c_fsn, u_cfsn, J_psn, R_int);
   
-  P_loss = f_D * rho * l_m * (u_cf ^ 2) / (2 * d_cap) * 10^(-5);
-  P_loss_HP = (In.Q * (8/(m*n)) * mu * l_m) * 10 ^(-5)/ ((d_cap/2)^4 * pi * 3.6*10^(6)) ;
-  // convert from pa to bar - Q from l/h to m3/s, flow is considered to be equally distributed through the m capillaries in the n fibres
+  (B, P_osmotic) = osmotic_pressure(R_gasconstant , alpha, T, c_fsn, v);
   
-  (B, P_osmotic) = osmotic_pressure(R_gasconstant, alpha, T, c_f, v);  
-  k_w = J_p/(TMP-P_osmotic); //calculates the TMP
-  R_raw = 1 - (Out_P.c/c_raw);
+  c_msn = CP * c_fsn; 
+  R_int = 1 - (Out_P.c/c_fsn);
+  R_obssn = 1 - (Out_P.c/c_msn);
+  tsn = D_i/k;
+
+  P_loss = f_D * rho * l_m *sn/4 * u_cfsn ^ 2 / (2 * d_cap) * 10^(-5);
+  P_loss_HP = (In.Q * (8/(m*n)) * mu * l_m * sn/4) * 10 ^(-5)/ ((d_cap/2)^4 * pi * 3.6*10^(6)) ;
+// convert from pa to bar - Q from l/h to m3/s, flow is considered to be equally distributed through the m capillaries in the n fibres
+  P_in + P_out = P_loss_HP;
+  TMP = (P_in + P_out);
   
-  
+  k_w = J_psn/(TMP-P_osmotic);
   end Membrane;
   
   model Permeate
@@ -192,22 +204,38 @@ package Nanofiltration_CP
   end Retentate;
   
   class Run
-
+  
   Raw_water RW;
   Feed F;
-  Membrane M;
-  Permeate P;
+  Membrane M1(sn=1);
+  Membrane M2(sn=2);
+  Membrane M3(sn=3);
+  Membrane M4(sn=4);
+  Permeate P1;
+  Permeate P2;
+  Permeate P3;
+  Permeate P4;
   Membrane_outlet MO;
   Retentate R;
-
+  
   equation
   connect (RW.Out,F.In_raw);
-  connect (F.Out, M.In);
-  connect (M.Out_P, P.In);
-  connect (M.Out_MO, MO.In);
+  connect (F.Out, M1.In);
+  
+  connect (M1.Out_P, P1.In);
+  connect (M2.Out_P, P2.In);
+  connect (M3.Out_P, P3.In);
+  connect (M4.Out_P, P4.In);
+    
+  //final permeate stream is made up of the 4 permeate streams
+  
+  connect (M1.Out_M, M2.In);
+  connect (M2.Out_M, M3.In);
+  connect (M3.Out_M, M4.In);
+  connect (M4.Out_M, MO.In);
   connect (MO.Out_R, R.In);
   connect (MO.Out_cyc, F.In_cyc); 
-
+  
   end Run;
 
   function Concentration_polarization
@@ -239,14 +267,14 @@ package Nanofiltration_CP
 
   function osmotic_pressure
   
-  input Real R_gasconstant, alpha, T, c_f, v "c_f is the only varaiation from one membrane module to the next";
+  input Real R_gasconstant, alpha, T, c_fsn, v;//c_f is the only varaiation from one membrane module to the next
   output Real B, P_osmotic;
 
   algorithm
   B := 1 + alpha*(v-1);
-  P_osmotic := B * R_gasconstant *10^(-2) * T * c_f / (1000 * 120.3676); // Use magnesium sulphate in moles
+  P_osmotic := B * R_gasconstant *10^(-2) * T * c_fsn / (1000 * 120.3676); // Use magnesium sulphate in moles
   
   end osmotic_pressure;
 
   
-end Nanofiltration_CP;
+end NF_LBL;
